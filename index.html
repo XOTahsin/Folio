@@ -153,7 +153,7 @@ svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stro
 .card{position:relative;display:flex;flex-direction:column;gap:6px;min-height:128px;padding:14px 16px 12px;border-radius:var(--r);text-align:left;cursor:pointer;
   content-visibility:auto;contain-intrinsic-size:auto 140px;transition:transform .18s,box-shadow .18s;overflow:hidden;
   --c1:#8a96aa;--c2:#5d6b82;--ink:#fff;--glow:rgba(120,140,170,.4)}
-.card h3{padding-right:24px;font-size:15px;font-weight:650;letter-spacing:-.01em;line-height:1.25;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card h3{padding-right:62px;font-size:15px;font-weight:650;letter-spacing:-.01em;line-height:1.25;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .card p{font-size:12.5px;line-height:1.45;opacity:.82;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .card .tags{display:flex;flex-wrap:wrap;gap:5px}
 .card .tg{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:99px}
@@ -538,6 +538,7 @@ const ICONS={
  search:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
  plus:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
  pin:'<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+ copy:'<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
  bell:'<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
  trash:'<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
  settings:'<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
@@ -787,7 +788,7 @@ function cardHTML(n,mode){
   const now=Date.now(), due=n.reminder?`<span class="due ${n.reminder<now?'over':''}">${ic('bell')}${fmtRem(n.reminder)}</span>`:'';
   const qa=mode==='trash'
     ?`<button data-act="restore" aria-label="Restore">${ic('restore')}</button><button data-act="purge" aria-label="Delete forever">${ic('trash')}</button>`
-    :`<button class="pinb" data-act="pin" aria-label="${n.pinned?'Unpin':'Pin'}">${ic('pin')}</button>`;
+    :`<button class="pinb" data-act="pin" aria-label="${n.pinned?'Unpin':'Pin'}" title="${n.pinned?'Unpin':'Pin'}">${ic('pin')}</button><button class="copyb" data-act="copy-note" aria-label="Copy note" title="Copy note">${ic('copy')}</button>`;
   return `<article class="card ${cls} ${n.pinned?'pinned':''} ${mode==='trash'?'trashed':''}" data-id="${n.id}" tabindex="0" role="button">
     <div class="qa">${qa}</div>
     <h3>${esc(n.title)||'Untitled'}</h3>
@@ -1145,6 +1146,42 @@ function fireReminder(id){
 }
 
 /* share / export / print */
+function noteBodyText(n){
+  if(!n.content)return n.text||'';
+  const doc=new DOMParser().parseFromString(String(n.content),'text/html');
+  doc.body.querySelectorAll('br').forEach(node=>node.replaceWith('\n'));
+  doc.body.querySelectorAll('p,div,h1,h2,h3,h4,h5,h6,blockquote,pre,li').forEach(node=>node.append(doc.createTextNode('\n')));
+  return (doc.body.textContent||n.text||'')
+    .replace(/\u00a0/g,' ')
+    .replace(/[ \t]+\n/g,'\n')
+    .replace(/\n[ \t]+/g,'\n')
+    .replace(/\n{3,}/g,'\n\n')
+    .trim()||n.text||'';
+}
+async function copyNote(n){
+  if(!n)return;
+  const body=noteBodyText(n);
+  const value=(n.title?n.title+'\n\n':'')+body;
+  if(!value.trim()){toast('This note is empty',1500);return;}
+  try{
+    if(!navigator.clipboard?.writeText)throw new Error('Clipboard API unavailable');
+    await navigator.clipboard.writeText(value);
+    toast('Note copied to clipboard');
+  }catch(error){
+    const field=document.createElement('textarea');
+    field.value=value;
+    field.setAttribute('readonly','');
+    field.style.cssText='position:fixed;left:-9999px;top:0;opacity:0;font-size:16px';
+    document.body.appendChild(field);
+    field.focus({preventScroll:true});
+    field.select();
+    field.setSelectionRange(0,field.value.length);
+    let copied=false;
+    try{copied=document.execCommand('copy')}catch(_){}
+    field.remove();
+    toast(copied?'Note copied to clipboard':'Could not copy this note',copied?2200:3000);
+  }
+}
 function shareNote(n){
   const data={title:n.title||'Note',text:(n.title?n.title+'\n\n':'')+(n.text||'')};
   if(navigator.share) navigator.share(data).catch(()=>{});
@@ -1206,6 +1243,7 @@ function act(name,el,ev){
   switch(name){
     case 'new-note': newNote(); break;
     case 'pin': ev.stopPropagation(); setPinned(id,!byId(id).pinned); break;
+    case 'copy-note': ev.stopPropagation(); copyNote(byId(id)); break;
     case 'restore': ev.stopPropagation(); {const n=byId(id);n.trashed=0;n.updated=Date.now();persistNotes();renderAll();toast('Restored')} break;
     case 'purge': ev.stopPropagation(); confirmBox('Delete forever?','This note will be permanently removed.','Delete',()=>{notes=notes.filter(n=>n.id!==id);persistNotes();renderAll()}); break;
     case 'empty-trash': confirmBox('Empty trash?','All deleted notes will be permanently removed.','Empty',()=>{notes=notes.filter(n=>!n.trashed);persistNotes();renderAll()}); break;
