@@ -1,5 +1,5 @@
 /* Folio service worker — instant loads + full offline support */
-const VERSION = 'folio-v3-2-firebase';
+const VERSION = 'folio-v3-3-copy-note';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png',
